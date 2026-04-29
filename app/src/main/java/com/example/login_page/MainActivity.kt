@@ -73,10 +73,11 @@ fun AppNavigation() {
         if (auth.currentUser != null) "video"
         else "welcome"
 
-    NavHost(navController, startDestination = "welcome") {
+    NavHost(navController, startDestination = startDestination) {
         composable("welcome") { WelcomeScreen(navController) }
         composable("login") { LoginScreen(navController) }
         composable("register") { RegisterScreen(navController) }
+        composable("profile") { ProfileScreen(navController) }
         composable("video") { VideoUploadScreen(navController) }
         composable("questionnaire") { QuestionnaireScreen(navController) }
         composable("map/{lat}/{lng}") { backStackEntry ->
@@ -89,17 +90,42 @@ fun AppNavigation() {
 
 /* ---------- HEADER ---------- */
 @Composable
-fun AppHeader() {
+fun AppHeader(navController: NavController? = null) {
+
     Surface(
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Text(
-            text = "Management App",
-            color = MaterialTheme.colorScheme.onPrimary,
-            fontSize = 22.sp,
-            modifier = Modifier.padding(16.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            Text(
+                text = "Management App",
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontSize = 20.sp
+            )
+            if (navController != null) {
+                TextButton(
+                    onClick = {
+                        com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
+
+                        navController.navigate("login") {
+                            popUpTo("video") { inclusive = true }
+                        }
+                    }
+                ) {
+                    Text(
+                        "Logout",
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+        }
     }
 }
 @Composable
@@ -280,7 +306,7 @@ fun LoginScreen(navController: NavController) {
 
                         if (success) {
                             userRepository.updateLastLogin { _ ->
-                                navController.navigate("video") {
+                                navController.navigate("profile") {
                                     popUpTo("login") { inclusive = true }
                                 }
                             }
@@ -322,8 +348,8 @@ fun RegisterScreen(navController: NavController) {
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
 
-    val authManager = FirebaseAuthManager()
-    val userRepository = FirebaseUserRepository()
+    val authManager = remember { FirebaseAuthManager() }
+    val userRepository = remember { FirebaseUserRepository() }
 
     Column(
         modifier = Modifier
@@ -356,6 +382,7 @@ fun RegisterScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // NAME
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -365,6 +392,7 @@ fun RegisterScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // EMAIL
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -375,6 +403,7 @@ fun RegisterScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // PHONE
             OutlinedTextField(
                 value = phone,
                 onValueChange = { phone = it },
@@ -384,6 +413,7 @@ fun RegisterScreen(navController: NavController) {
             )
 
             Spacer(modifier = Modifier.height(10.dp))
+
 
             OutlinedTextField(
                 value = password,
@@ -402,21 +432,29 @@ fun RegisterScreen(navController: NavController) {
 
             Button(
                 onClick = {
+                    if (name.isBlank() || email.isBlank() || phone.isBlank() || password.isBlank()) {
+                        error = "Please fill all fields"
+                        return@Button
+                    }
+
                     loading = true
                     error = ""
 
                     authManager.registerUser(email, password) { success, message ->
                         if (success) {
+
                             userRepository.saveUser(name, phone) { saved ->
                                 loading = false
+
                                 if (saved) {
-                                    navController.navigate("video") {
+                                    navController.navigate("profile") {
                                         popUpTo("register") { inclusive = true }
                                     }
                                 } else {
                                     error = "Failed to save user data"
                                 }
                             }
+
                         } else {
                             loading = false
                             error = message
@@ -433,7 +471,9 @@ fun RegisterScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            TextButton(onClick = { navController.popBackStack() }) {
+            TextButton(
+                onClick = { navController.popBackStack() }
+            ) {
                 Text("Already have an account? Login")
             }
         }
@@ -487,7 +527,7 @@ fun VideoUploadScreen(navController: NavController) {
             )
     ) {
 
-        AppHeader()
+        AppHeader(navController)
 
         Column(
             modifier = Modifier
